@@ -1,0 +1,122 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "centralus",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "servers_sqlserver_autoinfra_name": {
+      "defaultValue": "sqlserver-autoinfra",
+      "type": "String"
+    },
+    "adminUsername": {
+      "defaultValue": "sqladmin",
+      "type": "String"
+    },
+    "adminPassword": {
+      "defaultValue": "P@ssw0rd1234",
+      "type": "SecureString"
+    },
+    "firewallRuleName": {
+      "type": "string",
+      "defaultValue": "AllowAllIps"
+    },
+    "startIpAddress": {
+      "type": "string",
+      "defaultValue": "0.0.0.0"
+    },
+    "endIpAddress": {
+      "type": "string",
+      "defaultValue": "255.255.255.255"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[parameters('servers_sqlserver_autoinfra_name')]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "sqlserver-autoinfra": "AutoInfra-sqlserver"
+      },
+      "properties": {
+        "administratorLogin": "[parameters('adminUsername')]",
+        "administratorLoginPassword": "[parameters('adminPassword')]",
+        "version": "12.0",
+        "minimalTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled",
+        "restrictOutboundNetworkAccess": "Disabled"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/', parameters('firewallRuleName'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+      ],
+      "properties": {
+        "startIpAddress": "[parameters('startIpAddress')]",
+        "endIpAddress": "[parameters('endIpAddress')]"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+      ],
+      "tags": {
+        "Environment": "AutoInfra"
+      },
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic",
+        "capacity": 5
+      },
+      "kind": "v12.0,user",
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": 2147483648,
+        "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+        "zoneRedundant": false,
+        "readScale": "Disabled",
+        "requestedBackupStorageRedundancy": "Geo",
+        "maintenanceConfigurationId": "/subscriptions/0c9f472a-a9ee-49e9-86cd-cea259149b06/providers/Microsoft.Maintenance/publicMaintenanceConfigurations/SQL_Default",
+        "isLedgerOn": false,
+        "availabilityZone": "NoPreference"
+      }
+    },
+   
+    {
+      "type": "Microsoft.Sql/servers/databases/geoBackupPolicies",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/Default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]"
+      ],
+      "properties": {
+        "state": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]"
+      ],
+      "properties": {
+        "retentionDays": 7,
+        "diffBackupIntervalInHours": 24
+      }
+    }
+  ]
+}

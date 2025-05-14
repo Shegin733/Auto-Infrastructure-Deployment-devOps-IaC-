@@ -1,0 +1,67 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "name": {
+            "type": "string",
+            "defaultValue": "RecoverVault-AutoInfra",
+            "metadata": {
+                "description": "Name of the Recovery Services Vault"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "eastus",
+            "metadata": {
+                "description": "Location for the Recovery Services Vault"
+            }
+        },
+        "apiVersion": {
+            "type": "string",
+            "defaultValue": "2023-08-01"
+        },
+        "publicNetworkAccess": {
+            "type": "string",
+            "defaultValue": "Enabled"
+        },
+        "immutabilityState": {
+            "type": "string",
+            "defaultValue": "Unlocked"
+        },
+        "standardTierStorageRedundancy": {
+            "type": "string",
+            "defaultValue": "GeoRedundant"
+        },
+        "crossRegionRestore": {
+            "type": "string",
+            "defaultValue": "Enabled"
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "[parameters('apiVersion')]",
+            "name": "[parameters('name')]",
+            "location": "[parameters('location')]",
+            "type": "Microsoft.RecoveryServices/vaults",
+            "sku": {
+                "name": "RS0",
+                "tier": "Standard"
+            },
+            "properties": {
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "securitySettings": {
+                    "immutabilitySettings": {
+                        "state": "[parameters('immutabilityState')]"
+                    }
+                },
+                "redundancySettings": {
+                    "standardTierStorageRedundancy": "[parameters('standardTierStorageRedundancy')]",
+                    "crossRegionRestore": "[parameters('crossRegionRestore')]"
+                }
+            },
+            "tags": {
+                "Recoveryvault-AutoInfra": "RecoveryVault-AutoInfra-VMBackup"
+            }
+        }
+    ]
+}

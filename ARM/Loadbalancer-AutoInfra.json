@@ -1,0 +1,274 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "lbName": {
+            "type": "string",
+            "defaultValue": "IacAuto-LB"
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "eastus"
+        },
+        "publicIPName": {
+            "type": "string",
+            "defaultValue": "IacAuto-PublicIP"
+        },
+        "vm1NicName": {
+            "type": "string",
+            "defaultValue": "WinAutoInfraVM1-nic"
+        },
+        "vm2NicName": {
+            "type": "string",
+            "defaultValue": "WinAutoInfraVM2-nic"
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "defaultValue": "AutoInfra-VNET"
+        },
+        "subnetName": {
+            "type": "string",
+            "defaultValue": "AutoInfra-Subnet"
+        },
+        "servers_sqlserver_autoinfra_name": {
+            "defaultValue": "sqlserver-autoinfra",
+            "type": "String"
+        },
+        "adminUsername": {
+            "defaultValue": "sqladmin",
+            "type": "String"
+        },
+        "adminPassword": {
+            "defaultValue": "P@ssw0rd1234",
+            "type": "SecureString"
+        }
+    },
+    "variables": {
+        "virtualNetworkId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2021-05-01",
+            "name": "[parameters('publicIPName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2021-05-01",
+            "name": "[parameters('lbName')]",
+            "location": "[parameters('location')]",
+            "tags": {
+                "LB-Web-AutoInfra": "AutoInfra load balancer"
+            },
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "FEIPConfig-AutoInfra",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPName'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "BEPool-AutoInfra",
+                        "properties": {
+                            "loadBalancerBackendAddresses": [
+                                {
+                                    "name": "BackendIP1",
+                                    "properties": {
+                                        "ipAddress": "[reference(resourceId('Microsoft.Network/networkInterfaces', parameters('vm1NicName')), '2021-05-01').ipConfigurations[0].properties.privateIPAddress]",
+                                        "virtualNetwork": {
+                                            "id": "[variables('virtualNetworkId')]"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BackendIP2",
+                                    "properties": {
+                                        "ipAddress": "[reference(resourceId('Microsoft.Network/networkInterfaces', parameters('vm2NicName')), '2021-05-01').ipConfigurations[0].properties.privateIPAddress]",
+                                        "virtualNetwork": {
+                                            "id": "[variables('virtualNetworkId')]"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "HTTPRule",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('lbName')), '/frontendIPConfigurations/FEIPConfig-AutoInfra')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('lbName')), '/backendAddressPools/BEPool-AutoInfra')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 4,
+                            "loadDistribution": "Default",
+                            "disableOutboundSNAT": true
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "HealthProbe",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "port": 80,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ],
+                "outboundRules": [
+                    {
+                        "name": "OutboundRule-AutoInfra",
+                        "properties": {
+                            "allocatedOutboundPorts": 0,
+                            "protocol": "All",
+                            "idleTimeoutInMinutes": 4,
+                            "enableTcpReset": true,
+                            "backendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('lbName')), '/backendAddressPools/BEPool-AutoInfra')]"
+                            },
+                            "frontendIPConfigurations": [
+                                {
+                                    "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('lbName')), '/frontendIPConfigurations/FEIPConfig-AutoInfra')]"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[parameters('servers_sqlserver_autoinfra_name')]",
+            "location": "eastus",
+            "tags": {
+                "Environment": "AutoInfra"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('adminUsername')]",
+                "administratorLoginPassword": "[parameters('adminPassword')]",
+                "version": "12.0",
+                "minimalTlsVersion": "1.2",
+                "publicNetworkAccess": "Enabled",
+                "restrictOutboundNetworkAccess": "Disabled"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/firewallRules",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/AllowAllWindowsAzureIps')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra')]",
+            "location": "eastus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "tags": {
+                "Environment": "AutoInfra"
+            },
+            "sku": {
+                "name": "Basic",
+                "tier": "Basic",
+                "capacity": 5
+            },
+            "kind": "v12.0,user",
+            "properties": {
+                "collation": "SQL_Latin1_General_CP1_CI_AS",
+                "maxSizeBytes": 2147483648,
+                "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+                "zoneRedundant": false,
+                "readScale": "Disabled",
+                "requestedBackupStorageRedundancy": "Geo",
+                "maintenanceConfigurationId": "/subscriptions/0c9f472a-a9ee-49e9-86cd-cea259149b06/providers/Microsoft.Maintenance/publicMaintenanceConfigurations/SQL_Default",
+                "isLedgerOn": false,
+                "availabilityZone": "NoPreference"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases/transparentDataEncryption",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/Current')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]",
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases/geoBackupPolicies",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/Default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]",
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "properties": {
+                "state": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies",
+            "apiVersion": "2024-05-01-preview",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]",
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "properties": {
+                "retentionDays": 7,
+                "diffBackupIntervalInHours": 24
+            }
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases/auditingPolicies",
+            "apiVersion": "2014-04-01",
+            "name": "[concat(parameters('servers_sqlserver_autoinfra_name'), '/SqlDb-AutoInfra/Default')]",
+            "location": "eastus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('servers_sqlserver_autoinfra_name'), 'SqlDb-AutoInfra')]",
+                "[resourceId('Microsoft.Sql/servers', parameters('servers_sqlserver_autoinfra_name'))]"
+            ],
+            "properties": {
+                "auditingState": "Enabled"
+            }
+        }
+    ]
+}

@@ -1,0 +1,162 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "actionGroupName": {
+            "type": "string",
+            "defaultValue": "ag-cpualert-autoinfra",
+            "metadata": {
+                "description": "Name of the Action Group"
+            }
+        },
+        "actionGroupShortName": {
+            "type": "string",
+            "defaultValue": "AutoInfraAG",
+            "metadata": {
+                "description": "Short name for the Action Group"
+            }
+        },
+        "emailReceiver": {
+            "type": "string",
+            "defaultValue": "sheginismailap@gmail.com",
+            "metadata": {
+                "description": "Email address to receive alerts"
+            }
+        },
+        "smsCountryCode": {
+            "type": "string",
+            "defaultValue": "91",
+            "metadata": {
+                "description": "Country code for SMS receiver"
+            }
+        },
+        "smsPhoneNumber": {
+            "type": "string",
+            "defaultValue": "6235760921",
+            "metadata": {
+                "description": "Phone number for SMS receiver"
+            }
+        },
+        "alertRuleName": {
+            "type": "string",
+            "defaultValue": "CPU-Alert-AutoInfra",
+            "metadata": {
+                "description": "Name of the CPU alert rule"
+            }
+        },
+        "vm1Name": {
+            "type": "string",
+            "defaultValue": "WinAutoInfraVM1",
+            "metadata": {
+                "description": "Name of the first virtual machine"
+            }
+        },
+        "vm2Name": {
+            "type": "string",
+            "defaultValue": "WinAutoInfraVM2",
+            "metadata": {
+                "description": "Name of the second virtual machine"
+            }
+        },
+        "resourceGroupName": {
+            "type": "string",
+            "defaultValue": "AutoInfra-RG",
+            "metadata": {
+                "description": "Name of the resource group where the VMs are located"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "East US",
+            "metadata": {
+                "description": "Location for the resources"
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "microsoft.insights/actionGroups",
+            "apiVersion": "2024-10-01-preview",
+            "name": "[parameters('actionGroupName')]",
+            "location": "Global",
+            "tags": {
+                "Environment": "AutoInfra"
+            },
+            "properties": {
+                "groupShortName": "[parameters('actionGroupShortName')]",
+                "enabled": true,
+                "emailReceivers": [
+                    {
+                        "name": "EmailReceiver",
+                        "emailAddress": "[parameters('emailReceiver')]",
+                        "useCommonAlertSchema": false
+                    }
+                ],
+                "smsReceivers": [
+                    {
+                        "name": "SMSReceiver",
+                        "countryCode": "[parameters('smsCountryCode')]",
+                        "phoneNumber": "[parameters('smsPhoneNumber')]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "microsoft.insights/metricAlerts",
+            "apiVersion": "2018-03-01",
+            "name": "[parameters('alertRuleName')]",
+            "location": "global",
+            "tags": {
+                "Environment": "AutoInfra"
+            },
+            "dependsOn": [
+                "[resourceId('microsoft.insights/actionGroups', parameters('actionGroupName'))]"
+            ],
+            "properties": {
+                "description": "Average CPU Usage should not exceed 80%",
+                "severity": 2,
+                "enabled": true,
+                "scopes": [
+                    "[resourceId('Microsoft.Compute/virtualMachines', parameters('vm1Name'))]",
+                    "[resourceId('Microsoft.Compute/virtualMachines', parameters('vm2Name'))]"
+                ],
+                "evaluationFrequency": "PT1M",
+                "windowSize": "PT1M",
+                "criteria": {
+                    "allOf": [
+                        {
+                            "threshold": 80,
+                            "name": "HighCPU",
+                            "metricNamespace": "Microsoft.Compute/virtualMachines",
+                            "metricName": "Percentage CPU",
+                            "operator": "GreaterThan",
+                            "timeAggregation": "Average",
+                            "skipMetricValidation": false,
+                            "criterionType": "StaticThresholdCriterion"
+                        }
+                    ],
+                    "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria"
+                },
+                "autoMitigate": true,
+                "targetResourceType": "Microsoft.Compute/virtualMachines",
+                "targetResourceRegion": "[parameters('location')]",
+                "actions": [
+                    {
+                        "actionGroupId": "[resourceId('microsoft.insights/actionGroups', parameters('actionGroupName'))]",
+                        "webHookProperties": {}
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+        "actionGroupId": {
+            "type": "string",
+            "value": "[resourceId('microsoft.insights/actionGroups', parameters('actionGroupName'))]"
+        },
+        "alertRuleId": {
+            "type": "string",
+            "value": "[resourceId('microsoft.insights/metricAlerts', parameters('alertRuleName'))]"
+        }
+    }
+}
