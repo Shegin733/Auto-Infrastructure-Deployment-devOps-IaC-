@@ -26,8 +26,4 @@ This repository contains **ARM & Bicep templates** for automating Azure resource
 🔹 Azure CLI  
 🔹 GitHub  
 
-## Deployment Guide
-```sh
-git clone <your-repo-url>
-cd <your-repo-folder>
-az deployment group create --resource-group <ResourceGroupName> --template-file <template.json>
+
