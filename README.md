@@ -1,7 +1,7 @@
 #  Azure Infrastructure Automation
 
 ##  Overview
-This repository contains **ARM & Bicep templates** for automating Azure resource deployment using **Infrastructure as Code (IaC)**.
+This repository contains **ARM ** for automating Azure resource deployment using **Infrastructure as Code (IaC)**.
 
 ##  Infrastructure Setup
 1️⃣ Resource Group  
